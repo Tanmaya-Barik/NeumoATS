@@ -1,0 +1,27 @@
+{
+  "name": "neumo-ats",
+  "version": "1.0.0",
+  "description": "Zero-Login AI Resume Parser & ATS Intelligence Suite (Dark Neumorphic 3D Edition)",
+  "main": "backend/server.js",
+  "type": "module",
+  "scripts": {
+    "backend": "node backend/server.js",
+    "server": "node backend/server.js",
+    "frontend": "npm --prefix frontend run dev",
+    "client": "npm --prefix frontend run dev",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run backend\" \"npm run frontend\"",
+    "build": "npm --prefix frontend run build",
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #212529;
+  --bg-secondary: #262a2e;
+  --shadow-dark: #171a1d;
+  --shadow-light: #2b3035;
+  --accent-cyan: #38bdf8;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-crimson: #ef4444;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #212529;
+  color: #e2e8f0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar for Dark Neumorphism */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #212529;
+  box-shadow: inset 2px 2px 5px #171a1d, inset -2px -2px 5px #2b3035;
+}
+::-webkit-scrollbar-thumb {
+  background: #2b3035;
+  border-radius: 9999px;
+  box-shadow: 2px 2px 4px #171a1d;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}
+
+/* Neumorphic Core Utility Classes */
+.neumo-raised {
+  background: #212529;
+  box-shadow: 8px 8px 16px #171a1d, -8px -8px 16px #2b3035;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neumo-raised-card {
+  background: #262a2e;
+  box-shadow: 8px 8px 16px #171a1d, -8px -8px 16px #2b3035;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neumo-raised-sm {
+  background: #212529;
+  box-shadow: 4px 4px 8px #171a1d, -4px -4px 8px #2b3035;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neumo-inset {
+  background: #212529;
+  box-shadow: inset 6px 6px 12px #171a1d, inset -6px -6px 12px #2b3035;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neumo-inset-deep {
+  background: #1c2023;
+  box-shadow: inset 8px 8px 16px #14171a, inset -8px -8px 16px #24292e;
+}
+
+.neumo-inset-sm {
+  background: #212529;
+  box-shadow: inset 3px 3px 6px #171a1d, inset -3px -3px 6px #2b3035;
+}
+
+/* Tactile Interactive Buttons */
+.neumo-btn {
+  background: #212529;
+  box-shadow: 6px 6px 12px #171a1d, -6px -6px 12px #2b3035;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  user-select: none;
+}
+.neumo-btn:hover {
+  box-shadow: 8px 8px 16px #171a1d, -8px -8px 16px #2b3035;
+  filter: brightness(1.04);
+}
+.neumo-btn:active, .neumo-btn-pressed {
+  box-shadow: inset 5px 5px 10px #171a1d, inset -5px -5px 10px #2b3035 !important;
+  transform: translateY(1px);
+}
+
+.neumo-btn-primary {
+  background: linear-gradient(145deg, #23292e, #1f2327);
+  box-shadow: 6px 6px 14px #171a1d, -6px -6px 14px #2b3035;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+.neumo-btn-primary:hover {
+  box-shadow: 8px 8px 18px #171a1d, -8px -8px 18px #2b3035, 0 0 15px rgba(56, 189, 248, 0.3);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+}
+.neumo-btn-primary:active {
+  box-shadow: inset 6px 6px 12px #171a1d, inset -6px -6px 12px #2b3035 !important;
+  color: #38bdf8;
+}
+
+/* Pinned button active styling */
+.neumo-pinned {
+  box-shadow: inset 4px 4px 8px #171a1d, inset -4px -4px 8px #2b3035 !important;
+  background: #1e2226;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+/* Glowing alerts */
+.neumo-alert-crimson {
+  background: linear-gradient(145deg, #281a1c, #211517);
+  box-shadow: 8px 8px 16px #171a1d, -8px -8px 16px #2b3035, 0 0 24px rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.neumo-alert-amber {
+  background: linear-gradient(145deg, #2a2217, #211c14);
+  box-shadow: 8px 8px 16px #171a1d, -8px -8px 16px #2b3035, 0 0 24px rgba(245, 158, 11, 0.25);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* Skill tag badges */
+.skill-badge-verified {
+  background: #1e2824;
+  box-shadow: 3px 3px 6px #171a1d, -3px -3px 6px #2b3035;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+.skill-badge-unverified {
+  background: #29241b;
+  box-shadow: 3px 3px 6px #171a1d, -3px -3px 6px #2b3035;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+.skill-badge-missing {
+  background: #2b1d1f;
+  box-shadow: 3px 3px 6px #171a1d, -3px -3px 6px #2b3035;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* Pulse animation for scanning radar */
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+.animate-radar {
+  animation: radar-pulse 2s infinite ease-in-out;
+}
