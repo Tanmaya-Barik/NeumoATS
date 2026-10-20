@@ -546,6 +546,8 @@ const OFFLINE_FALLBACK_PRESETS = {
   }
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 async function callGeminiMultimodalATS(jdFileObj, resumeFileObj, customApiKey = '') {
   // 1. Try Backend /api/analyze route
   try {
@@ -569,7 +571,7 @@ async function callGeminiMultimodalATS(jdFileObj, resumeFileObj, customApiKey = 
       headers['x-gemini-key'] = customApiKey;
     }
 
-    const response = await fetch('/api/analyze', {
+    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
       method: 'POST',
       headers,
       body: formData
@@ -1031,7 +1033,7 @@ export default function App() {
 
   const checkBackendHealth = useCallback(async () => {
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch(`${API_BASE_URL}/api/health`);
       if (res.ok) {
         const data = await res.json();
         setServerHasKey(Boolean(data.hasApiKey));
