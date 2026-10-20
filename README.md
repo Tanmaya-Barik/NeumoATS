@@ -88,6 +88,31 @@ npm run dev
 
 ---
 
+## ☁️ Deploying to Vercel
+
+NeumoATS is ready for zero-config Vercel Serverless deployment with RAM-only processing and 60-second function timeouts.
+
+### Option 1: Unified Fullstack Deployment (Recommended)
+Deploy both the React frontend and Express backend under a single Vercel project and domain:
+
+1. Import your GitHub repository into [Vercel](https://vercel.com/new).
+2. Set **Root Directory** to `./` (the repository root).
+3. Under **Environment Variables**, add:
+   - `GEMINI_API_KEY`: Your Google Gemini API key.
+4. Click **Deploy**. Vercel will build the frontend into `frontend/dist` and mount `/api/*` to the serverless backend function in `api/index.js`.
+
+### Option 2: Standalone Backend Deployment
+If you already deployed the frontend separately and want the backend on its own Vercel URL:
+
+1. Import the repository into Vercel as a new project (e.g. `neumoats-backend`).
+2. Set **Root Directory** to `./`.
+3. Add `GEMINI_API_KEY` under **Environment Variables**.
+4. In your frontend Vercel project settings, set:
+   - `VITE_API_URL`: `https://your-backend-project.vercel.app`
+5. Redeploy your frontend.
+
+---
+
 ## 📜 License
 
 MIT License. Crafted with precision by Tanmaya Barik.

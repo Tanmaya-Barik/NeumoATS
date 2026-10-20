@@ -15,7 +15,17 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Resolve static dist paths early
+const frontendDist = path.join(__dirname, '../frontend/dist');
+const clientDist = path.join(__dirname, '../client/dist');
+const staticDist = fs.existsSync(frontendDist) ? frontendDist : clientDist;
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-gemini-key'],
+  credentials: true
+}));
 app.use(express.json());
 
 // In-Memory Multer storage: Files never touch disk! Zero-DB, 100% RAM.
@@ -162,8 +172,27 @@ const atsAnalysisSchema = {
   ]
 };
 
+// Express Router mounting for serverless & standard environments
+const apiRouter = express.Router();
+
+// Root API status check
+apiRouter.get('/', (req, res, next) => {
+  if (req.baseUrl === '' && fs.existsSync(path.join(staticDist, 'index.html'))) {
+    return next();
+  }
+  res.json({
+    name: 'NeumoATS API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      analyze: '/api/analyze'
+    }
+  });
+});
+
 // Health and Config Check
-app.get('/api/health', (req, res) => {
+apiRouter.get('/health', (req, res) => {
   const hasKey = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== '');
   res.json({
     status: 'ok',
@@ -175,8 +204,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Primary ATS Analysis Route (supports multipart PDF uploads and virtual PDF JSON payloads)
-app.post(
-  '/api/analyze',
+apiRouter.post(
+  '/analyze',
   upload.fields([
     { name: 'jd', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
@@ -313,21 +342,33 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
   }
 );
 
+// Mount router under BOTH /api and / to handle Vercel rewrites and direct calls seamlessly
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
+
 // Serve static frontend in production if built
-const frontendDist = path.join(__dirname, '../frontend/dist');
-const clientDist = path.join(__dirname, '../client/dist');
-const staticDist = fs.existsSync(frontendDist) ? frontendDist : clientDist;
-app.use(express.static(staticDist));
+if (fs.existsSync(staticDist)) {
+  app.use(express.static(staticDist));
+}
 
 app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(staticDist, 'index.html'), (err) => {
-    if (err) {
-      res.status(200).send('NeumoATS Backend API is active. Start Vite frontend on port 5173 for development.');
-    }
+  if (req.path.startsWith('/api') || req.path === '/health' || req.path === '/analyze') return next();
+  if (fs.existsSync(path.join(staticDist, 'index.html'))) {
+    return res.sendFile(path.join(staticDist, 'index.html'));
+  }
+  return res.status(200).json({
+    name: 'NeumoATS API',
+    status: 'active',
+    health: '/api/health',
+    analyze: '/api/analyze'
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`NeumoATS Server running on http://localhost:${PORT}`);
-});
+// Start persistent server only outside Vercel Serverless environment
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`NeumoATS Server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

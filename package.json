@@ -10,7 +10,8 @@
     "frontend": "npm --prefix frontend run dev",
     "client": "npm --prefix frontend run dev",
     "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run backend\" \"npm run frontend\"",
-    "build": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "postinstall": "npm --prefix frontend install",
     "start": "node backend/server.js"
   },
   "dependencies": {
