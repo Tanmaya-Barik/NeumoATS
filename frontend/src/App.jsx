@@ -650,6 +650,7 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
           topP: 1,
           topK: 1,
           seed: 42,
+          thinkingConfig: { thinkingBudget: 0 },
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'OBJECT',

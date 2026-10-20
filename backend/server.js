@@ -270,6 +270,7 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
       const ai = new GoogleGenAI({ apiKey });
 
       const candidateModels = [
+        'gemini-2.5-flash',
         'gemini-3-flash-preview',
         'gemini-3.5-flash',
         'gemini-3.8-flash',
@@ -282,18 +283,36 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
       for (const model of candidateModels) {
         try {
           console.log(`[NeumoATS] Analyzing with model: ${model}...`);
-          response = await ai.models.generateContent({
-            model,
-            contents: [{ role: 'user', parts }],
-            config: {
-              temperature: 0,
-              topP: 1,
-              topK: 1,
-              seed: 42,
-              responseMimeType: 'application/json',
-              responseSchema: atsAnalysisSchema,
-            },
-          });
+          const config = {
+            temperature: 0,
+            topP: 1,
+            topK: 1,
+            seed: 42,
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: 'application/json',
+            responseSchema: atsAnalysisSchema,
+          };
+
+          try {
+            response = await ai.models.generateContent({
+              model,
+              contents: [{ role: 'user', parts }],
+              config,
+            });
+          } catch (thinkingErr) {
+            // Fallback without thinkingConfig if an older model does not support it
+            if (thinkingErr.message?.includes('thinkingConfig') || thinkingErr.message?.includes('thinkingBudget')) {
+              delete config.thinkingConfig;
+              response = await ai.models.generateContent({
+                model,
+                contents: [{ role: 'user', parts }],
+                config,
+              });
+            } else {
+              throw thinkingErr;
+            }
+          }
+
           if (response && response.text) {
             console.log(`[NeumoATS] Successfully analyzed documents with: ${model}`);
             break;
