@@ -15,11 +15,6 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Resolve static dist paths early
-const frontendDist = path.join(__dirname, '../frontend/dist');
-const clientDist = path.join(__dirname, '../client/dist');
-const staticDist = fs.existsSync(frontendDist) ? frontendDist : clientDist;
-
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -197,7 +192,7 @@ apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     hasApiKey: hasKey,
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3.5-flash-lite',
     zeroLogin: true,
     zeroDb: true
   });
@@ -270,7 +265,9 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
       const ai = new GoogleGenAI({ apiKey });
 
       const candidateModels = [
-        'gemini-2.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-flash-lite-latest',
         'gemini-3-flash-preview',
         'gemini-3.5-flash',
         'gemini-3.8-flash',
@@ -283,36 +280,18 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
       for (const model of candidateModels) {
         try {
           console.log(`[NeumoATS] Analyzing with model: ${model}...`);
-          const config = {
-            temperature: 0,
-            topP: 1,
-            topK: 1,
-            seed: 42,
-            thinkingConfig: { thinkingBudget: 0 },
-            responseMimeType: 'application/json',
-            responseSchema: atsAnalysisSchema,
-          };
-
-          try {
-            response = await ai.models.generateContent({
-              model,
-              contents: [{ role: 'user', parts }],
-              config,
-            });
-          } catch (thinkingErr) {
-            // Fallback without thinkingConfig if an older model does not support it
-            if (thinkingErr.message?.includes('thinkingConfig') || thinkingErr.message?.includes('thinkingBudget')) {
-              delete config.thinkingConfig;
-              response = await ai.models.generateContent({
-                model,
-                contents: [{ role: 'user', parts }],
-                config,
-              });
-            } else {
-              throw thinkingErr;
-            }
-          }
-
+          response = await ai.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts }],
+            config: {
+              temperature: 0,
+              topP: 1,
+              topK: 1,
+              seed: 42,
+              responseMimeType: 'application/json',
+              responseSchema: atsAnalysisSchema,
+            },
+          });
           if (response && response.text) {
             console.log(`[NeumoATS] Successfully analyzed documents with: ${model}`);
             break;
@@ -324,7 +303,14 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
       }
 
       if (!response || !response.text) {
-        throw new Error(`All Gemini models failed. Last error: ${lastModelError?.message || 'Unknown error'}`);
+        let cleanMsg = lastModelError?.message || 'Unknown error';
+        try {
+          const parsed = JSON.parse(cleanMsg);
+          if (parsed?.error?.message) {
+            cleanMsg = parsed.error.message;
+          }
+        } catch {}
+        throw new Error(`All Gemini models failed. Last error: ${cleanMsg}`);
       }
 
       const text = response.text;
@@ -366,6 +352,9 @@ app.use('/api', apiRouter);
 app.use('/', apiRouter);
 
 // Serve static frontend in production if built
+const frontendDist = path.join(__dirname, '../frontend/dist');
+const clientDist = path.join(__dirname, '../client/dist');
+const staticDist = fs.existsSync(frontendDist) ? frontendDist : clientDist;
 if (fs.existsSync(staticDist)) {
   app.use(express.static(staticDist));
 }

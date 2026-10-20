@@ -612,7 +612,7 @@ async function callGeminiMultimodalATS(jdFileObj, resumeFileObj, customApiKey = 
   const apiKey = customApiKey || localStorage.getItem('GEMINI_API_KEY') || '';
   if (apiKey) {
     try {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
 
       const systemInstruction = `You are a Deterministic Principal Technical Recruiter and Forensic PDF Auditor.
 Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
@@ -650,7 +650,6 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
           topP: 1,
           topK: 1,
           seed: 42,
-          thinkingConfig: { thinkingBudget: 0 },
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'OBJECT',
@@ -1159,9 +1158,14 @@ export default function App() {
         return [...prev, newEntry];
       });
     } catch (err) {
-      const userMessage = err?.message && !err.message.includes('object Object')
+      let userMessage = err?.message && !err.message.includes('object Object')
         ? err.message
         : 'PDF analysis failed. Please verify files or Gemini API key and try again.';
+      try {
+        if (userMessage.includes('{') && userMessage.includes('RESOURCE_EXHAUSTED')) {
+          userMessage = 'Gemini API quota exceeded for this model. You can enter a custom Gemini API Key via the key icon in the top header, or try again later.';
+        }
+      } catch {}
       setValidationError({ status: 'API_ERROR', message: userMessage });
     } finally {
       setIsAnalyzing(false);
