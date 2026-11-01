@@ -39,15 +39,21 @@ const upload = multer({
   },
 });
 
-// Deterministic ATS Scoring Formula
-function computeDeterministicAtsScore(verified = [], unverified = [], missing = [], isSuspicious = false) {
+// Deterministic ATS Scoring Formula with Live Project Proof-of-Work Bonus
+function computeDeterministicAtsScore(verified = [], unverified = [], missing = [], isSuspicious = false, liveProjectLinks = []) {
   const vCount = (verified || []).length;
   const uCount = (unverified || []).length;
   const mCount = (missing || []).length;
   const total = vCount + uCount + mCount;
   if (total === 0) return 0;
 
-  let rawScore = Math.round(((vCount * 1.0 + uCount * 0.45) / total) * 100);
+  let baseScore = Math.round(((vCount * 1.0 + uCount * 0.45) / total) * 100);
+
+  // Live Project Proof-of-Work Bonus (+5% per live deployment/project link, max +10%)
+  const linkCount = (liveProjectLinks || []).length;
+  const liveBonus = Math.min(10, linkCount * 5);
+
+  let rawScore = baseScore + liveBonus;
   if (isSuspicious) {
     rawScore = Math.max(5, rawScore - 30);
   }
@@ -99,6 +105,23 @@ const atsAnalysisSchema = {
       },
       description: 'All social media accounts, portfolio URLs, or profile handles extracted from the resume.'
     },
+    liveProjectLinks: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          projectName: { type: 'STRING', description: 'Name of the project' },
+          liveUrl: { type: 'STRING', description: 'Live deployment or repository URL (e.g. Vercel, Netlify, Render, GitHub repo, custom domain, app link)' },
+          description: { type: 'STRING', description: 'One-sentence summary of the project and technologies used' }
+        },
+        required: ['projectName', 'liveUrl']
+      },
+      description: 'All functional live deployed website/app URLs, demos, or public project repositories extracted from the candidate projects or experience.'
+    },
+    liveProjectBonus: {
+      type: 'INTEGER',
+      description: 'Proof-of-work bonus added to ATS score: +5% per detected live project URL (max +10%). 0 if none found.'
+    },
     atsScore: {
       type: 'INTEGER',
       description: 'ATS match score from 0 to 100.'
@@ -106,17 +129,17 @@ const atsAnalysisSchema = {
     verifiedSkills: {
       type: 'ARRAY',
       items: { type: 'STRING' },
-      description: 'Skills explicitly required by the JD AND substantiated with tangible evidence in projects or work history in the resume.'
+      description: 'All technical skills substantiated with project proof, work experience, or inherent stack prerequisites (e.g. React.js, Node.js, Express.js, MongoDB, TypeScript, JavaScript (ES6+), HTML5, CSS3, JSX, Vite, REST APIs, Socket.io, JWT Authentication, Authentication & Authorization, Client-Server Architecture, Axios, Tailwind CSS, Responsive Web Design, Git, GitHub, Postman, npm, VS Code, Vercel/Render, REST API Testing).'
     },
     unverifiedSkills: {
       type: 'ARRAY',
       items: { type: 'STRING' },
-      description: 'Skills listed in the resume skills section but lacking concrete proof or context in projects or experience.'
+      description: 'Alternative, secondary, or unused technologies that the candidate listed in their resume but were not utilized in their projects (e.g. MySQL, SQL, PostgreSQL when projects used MongoDB; Bootstrap when projects used Tailwind). STRICT RULE: A skill MUST be physically written in the candidate resume to be here! NEVER put JD requirements here if they are missing from the resume.'
     },
     missingSkills: {
       type: 'ARRAY',
       items: { type: 'STRING' },
-      description: 'Key required skills from the JD that do not appear anywhere in the resume.'
+      description: 'SKILL GAPS: All core skills, frameworks, or technologies required or emphasized by Document 1 (Job Description) that are completely absent from Document 2 (Candidate Resume). For example, if JD requires C# and .NET, and the resume never mentions them, they MUST be listed here.'
     },
     cheatDetection: {
       type: 'OBJECT',
@@ -156,6 +179,8 @@ const atsAnalysisSchema = {
     'emailId',
     'nationality',
     'socialProfiles',
+    'liveProjectLinks',
+    'liveProjectBonus',
     'atsScore',
     'verifiedSkills',
     'unverifiedSkills',
@@ -240,7 +265,23 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
   3. emailId: Email address if mentioned, otherwise "Not Provided".
   4. nationality: Nationality/Citizenship if explicitly stated or inferred from address/country code if clear, otherwise "Not Mentioned".
   5. socialProfiles: Extract EVERY single social media ID, handle, or URL mentioned anywhere in the resume (e.g., LinkedIn, GitHub, Instagram, X / Twitter, YouTube, Portfolio Website, LeetCode, Medium, Behance, Kaggle, etc.).
-- Cross-examine required skills against candidate projects to classify into verifiedSkills (backed by project evidence), unverifiedSkills (listed in skills section but no project mention), and missingSkills (absent from resume).
+  6. liveProjectLinks: Extract ALL functional live project URLs, deployed application demos (e.g. *.vercel.app, *.netlify.app, *.render.com, *.github.io, custom domains, live apps) and project-specific repository links attached to candidate projects. For each, extract projectName, liveUrl, and brief description.
+- EXHAUSTIVE SKILL EXTRACTION & INTELLIGENT RECRUITER VERIFICATION:
+  * COMPREHENSIVE RESUME COVERAGE: Extract EVERY SINGLE technical skill, programming language, framework, library, database, protocol, runtime, architecture, and tool mentioned anywhere in Document 2 (Candidate Resume) — across Technologies, Summary, Experience, and Projects.
+  * INTELLIGENT RECRUITER VERIFICATION (REAL-WORLD ENGINEERING STANDARDS):
+    1. verifiedSkills (Substantiated & Inherent Tech Stack):
+       - Direct Project Evidence: Skills explicitly mentioned in projects, work experience, or deployments (e.g. React.js, Node.js, Express.js, MongoDB, TypeScript, REST APIs, Socket.io, JWT Authentication, Axios, Tailwind CSS, Responsive Web Design, Cloudinary, Vite).
+       - Inherent Prerequisite & Workflow Verification: As an expert technical recruiter, recognize that you CANNOT build and deploy React, Node, or full-stack web applications without foundational web technologies! Therefore, if a candidate has proven projects in React.js / Frontend / Full-Stack development, foundational technologies listed on their resume — specifically JavaScript (ES6+), HTML5, CSS3, JSX, Authentication & Authorization, Client-Server Architecture, Git, GitHub, Postman, npm, VS Code, Vercel/Render, and REST API Testing — are LEGITIMATELY VERIFIED as integral parts of building, testing, and deploying their applications. Place them in verifiedSkills!
+    2. unverifiedSkills (Genuinely Alternative / Unused Claimed Skills):
+       - Reserve this strictly for separate, unproven technologies listed in the skills bank that were NOT used in any project.
+       - For example: if the candidate's projects used MongoDB, but they listed MySQL, SQL, PostgreSQL, or Bootstrap without building projects with them, those specific alternative databases or unused libraries belong in unverifiedSkills.
+       - STRICT NEGATIVE CONSTRAINT: A skill can ONLY be in unverifiedSkills if it physically appears in the resume text!
+    3. missingSkills (Skill Gaps):
+       - Every requirement demanded by Document 1 (Job Description) that does NOT appear in Document 2 (Resume) at all (e.g. C#, .NET).
+       - Placing a missing JD requirement into unverifiedSkills is STRICTLY FORBIDDEN!
+- Proof-of-Work Score Boost:
+  * Each verified live project deployment link grants a +5% score bonus (capped at max +10% boost).
+  * In applicantFeedback and recruiterSummary, explicitly mention if live project links were detected, how many live links were found, and that having working live demo links increased the candidate's ATS score!
 - Check resume for white-text stuffing or keyword manipulation (cheatDetection).
 - Provide applicantFeedback, recruiterSummary, and 3 targeted interviewQuestions.`;
 
@@ -262,10 +303,24 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
         parts.push({ text: `--- DOCUMENT 2 (PDF RESUME CONTENT: "${resumeName}") ---\n${resumeText}` });
       }
 
+      parts.push({
+        text: `### CRITICAL MANDATORY INSTRUCTIONS FOR PRINCIPAL RECRUITER EVALUATION:
+1. INHERENT & FOUNDATIONAL VERIFICATION:
+   - When a candidate demonstrates full-stack React/Node projects with live deployments:
+     * JavaScript (ES6+), HTML5, CSS3, JSX, Vite, Axios, Authentication & Authorization, Client-Server Architecture, Git, GitHub, Postman, npm, VS Code, Vercel, Render, and REST API Testing are core, intrinsic parts of that verified stack. Place them in verifiedSkills!
+2. GENUINE UNVERIFIED SKILLS:
+   - Only place unused alternative tools listed in the resume (such as MySQL, SQL, PostgreSQL, Bootstrap) that were not part of their MERN projects into unverifiedSkills.
+3. STRICT SKILL GAPS:
+   - Any JD requirement missing from the resume (such as C#, .NET) MUST be in missingSkills (Skill Gap). NEVER put missing JD requirements into unverifiedSkills!`
+      });
+
       const ai = new GoogleGenAI({ apiKey });
 
       const candidateModels = [
         'gemini-3.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
         'gemini-3.1-flash-lite',
         'gemini-flash-lite-latest',
         'gemini-3-flash-preview',
@@ -318,13 +373,17 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
 
       // Compute deterministic ATS score if VALID
       if (parsedData.validationStatus === 'VALID') {
+        const linkCount = (parsedData.liveProjectLinks || []).length;
+        parsedData.liveProjectBonus = Math.min(10, linkCount * 5);
         parsedData.atsScore = computeDeterministicAtsScore(
           parsedData.verifiedSkills,
           parsedData.unverifiedSkills,
           parsedData.missingSkills,
-          parsedData.cheatDetection?.isSuspicious
+          parsedData.cheatDetection?.isSuspicious,
+          parsedData.liveProjectLinks
         );
       } else {
+        parsedData.liveProjectBonus = 0;
         parsedData.atsScore = 0;
       }
 
