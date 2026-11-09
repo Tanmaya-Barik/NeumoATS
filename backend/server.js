@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { PDFDocument, PDFName, PDFDict } from 'pdf-lib';
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +39,105 @@ const upload = multer({
     }
   },
 });
+
+// Extract clickable URI hyperlinks from PDF Annotations (/Annots -> /A -> /URI)
+async function extractEmbeddedPdfLinks(pdfBuffer) {
+  const links = [];
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) return links;
+  try {
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pages = pdfDoc.getPages();
+    for (const page of pages) {
+      const annots = page.node.Annots();
+      if (!annots) continue;
+      for (let j = 0; j < annots.size(); j++) {
+        const annot = pdfDoc.context.lookup(annots.get(j));
+        if (annot instanceof PDFDict) {
+          const a = pdfDoc.context.lookup(annot.get(PDFName.of('A')));
+          if (a instanceof PDFDict) {
+            const uri = a.get(PDFName.of('URI'));
+            if (uri) {
+              const val = uri.value || (uri.asString ? uri.asString() : uri.toString());
+              if (val && typeof val === 'string' && val.startsWith('http')) {
+                links.push(val.trim());
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('PDF link extraction error:', err.message);
+  }
+  return [...new Set(links)];
+}
+
+// Reconcile Gemini-extracted projects with actual clickable URLs embedded in the PDF
+function reconcileProjectLinks(geminiProjects = [], embeddedUrls = []) {
+  if (!embeddedUrls || embeddedUrls.length === 0) return geminiProjects || [];
+
+  const candidateProjectUrls = embeddedUrls.filter(url => {
+    const u = url.toLowerCase();
+    if (u.includes('linkedin.com')) return false;
+    if (u.includes('twitter.com') || u.includes('x.com')) return false;
+    if (u.includes('instagram.com')) return false;
+    // Pure root GitHub user profile without project path
+    const githubProfileMatch = u.match(/^https?:\/\/(www\.)?github\.com\/[^\/]+\/?$/);
+    if (githubProfileMatch) return false;
+    return true;
+  });
+
+  if (candidateProjectUrls.length === 0) return geminiProjects || [];
+
+  const usedUrls = new Set();
+
+  const reconciled = (geminiProjects || []).map((proj, idx) => {
+    const rawName = (proj.projectName || '').toLowerCase();
+    const cleanName = rawName.replace(/[^a-z0-9]/g, '');
+    const nameTokens = rawName.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(t => t.length >= 3);
+
+    let bestUrl = null;
+    let bestScore = 0;
+
+    for (const url of candidateProjectUrls) {
+      if (usedUrls.has(url)) continue;
+      const urlClean = url.toLowerCase().replace(/[^a-z0-9]/g, '');
+      let score = 0;
+
+      // Direct slug match (e.g. 'neumoats' in 'neumoatsfrontendthreevercelapp')
+      if (urlClean.includes(cleanName) || cleanName.includes(urlClean.split('vercel')[0]) || cleanName.includes(urlClean.split('github')[0])) {
+        score += 10;
+      }
+
+      for (const token of nameTokens) {
+        if (urlClean.includes(token)) {
+          score += 2;
+        }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestUrl = url;
+      }
+    }
+
+    // Fallback: if there are remaining candidate URLs and counts match 1:1 by order
+    if (!bestUrl && candidateProjectUrls[idx] && !usedUrls.has(candidateProjectUrls[idx])) {
+      bestUrl = candidateProjectUrls[idx];
+    }
+
+    if (bestUrl) {
+      usedUrls.add(bestUrl);
+      return {
+        ...proj,
+        liveUrl: bestUrl
+      };
+    }
+    return proj;
+  });
+
+  return reconciled;
+}
 
 // Deterministic ATS Scoring Formula with Live Project Proof-of-Work Bonus
 function computeDeterministicAtsScore(verified = [], unverified = [], missing = [], isSuspicious = false, liveProjectLinks = []) {
@@ -303,6 +403,25 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
         parts.push({ text: `--- DOCUMENT 2 (PDF RESUME CONTENT: "${resumeName}") ---\n${resumeText}` });
       }
 
+      // Extract genuine clickable hyperlinks directly from resume PDF binary metadata
+      let embeddedResumeLinks = [];
+      if (resumeFile && resumeFile.buffer) {
+        embeddedResumeLinks = await extractEmbeddedPdfLinks(resumeFile.buffer);
+      }
+
+      if (embeddedResumeLinks.length > 0) {
+        parts.push({
+          text: `### CRITICAL EMBEDDED HYPERLINKS EXTRACTED DIRECTLY FROM RESUME PDF ANNOTATIONS:
+The candidate's resume PDF physically contains these verified clickable URLs:
+${embeddedResumeLinks.map(url => `- ${url}`).join('\n')}
+
+MANDATORY INSTRUCTIONS FOR "liveProjectLinks":
+- DO NOT invent, fabricate, or guess GitHub repository links like "https://github.com/username/project"!
+- Every project with a live web demo (e.g. *.vercel.app, *.github.io, *.netlify.app, *.render.com) MUST be assigned its EXACT, genuine URL from the embedded list above!
+- For example, if the resume has "https://neumo-ats-frontend-three.vercel.app/" or "https://username.github.io/project/", use that exact URL so the links open the actual live web pages!`
+        });
+      }
+
       parts.push({
         text: `### CRITICAL MANDATORY INSTRUCTIONS FOR PRINCIPAL RECRUITER EVALUATION:
 1. INHERENT & FOUNDATIONAL VERIFICATION:
@@ -370,6 +489,11 @@ Inspect PDF Document 1 (JD box) and PDF Document 2 (Resume box).
 
       const text = response.text;
       const parsedData = JSON.parse(text);
+
+      // Reconcile live project links with genuine embedded PDF hyperlink metadata
+      if (embeddedResumeLinks.length > 0) {
+        parsedData.liveProjectLinks = reconcileProjectLinks(parsedData.liveProjectLinks, embeddedResumeLinks);
+      }
 
       // Compute deterministic ATS score if VALID
       if (parsedData.validationStatus === 'VALID') {

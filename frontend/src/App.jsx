@@ -1008,7 +1008,8 @@ export default function App() {
       let aiData = fingerprintCacheRef.current[pairKey];
 
       if (!aiData) {
-        aiData = await callMultimodalATS(customJd, customResume, customKey);
+        const activeKey = customKey || localStorage.getItem('GEMINI_API_KEY') || '';
+        aiData = await callMultimodalATS(customJd, customResume, activeKey);
         fingerprintCacheRef.current[pairKey] = aiData;
       }
 
